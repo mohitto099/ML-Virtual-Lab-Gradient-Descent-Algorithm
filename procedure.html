@@ -14,7 +14,7 @@
 <li><b>Take single steps.</b> Press <b>Step</b> five times. Watch the line rise and the dot on the contour map move toward the dark centre. Read the gradient line under the charts.</li>
 <li><b>Press Play</b> with the defaults (scaling on, learning rate 0.1, batch). Note how many steps it takes to reach "Converged".</li>
 <li><b>Try a tiny learning rate</b> (about 0.001). Record the steps needed and the error after 300 steps.</li>
-<li><b>Try a large learning rate</b> (about 1.0 and above). Observe the error curve and the status message.</li>
+<li><b>Try large learning rates.</b> First set α = 1.0, which lands almost on the best fit in a step or two. Then raise it to 1.9 (the error bounces from side to side) and to 2.5 or more (the error explodes). Observe the error curve and the status message each time.</li>
 <li><b>Turn feature scaling off.</b> The lab picks a safe learning rate for raw areas. Play, and compare the contour map and the error curve with step 3. Then raise the learning rate until training diverges.</li>
 <li><b>Compare methods.</b> With scaling on, switch between batch, stochastic and mini-batch. Compare how smooth each error curve is and how close each gets to the minimum.</li>
 <li><b>Choose your own start.</b> Click anywhere on the contour map to place the starting point, and drag the 3D surface to view the bowl from other angles. Does the final line depend on where you began?</li>
@@ -24,6 +24,6 @@
 <table><tr><th>Setting</th><th>Steps to converge</th><th>Final error (₹ L)</th><th>Remark</th></tr>
 <tr><td>Scaled, α = 0.1</td><td></td><td></td><td></td></tr>
 <tr><td>Scaled, α = 0.001</td><td></td><td></td><td></td></tr>
-<tr><td>Scaled, α = 1.0+</td><td></td><td></td><td></td></tr>
+<tr><td>Scaled, α = 2.5+</td><td></td><td></td><td></td></tr>
 <tr><td>Unscaled, safe α</td><td></td><td></td><td></td></tr></table>
 </main></div></body></html>
