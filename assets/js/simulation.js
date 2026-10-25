@@ -15,7 +15,7 @@
   const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
   const mu = mean(A), sd = Math.sqrt(mean(A.map((a) => (a - mu) ** 2)));
 
-  const S = { scale: true, lr: 0.1, method: 'batch', w: 0, b: 0, sw: 0, sb: 0, step: 0, hist: [], path: [], play: false, max: 300, spf: 3, g: null };
+  const S = { scale: true, lr: 0.1, method: 'batch', w: 0, b: 0, sw: 0, sb: 0, step: 0, hist: [], path: [], play: false, max: 300, spf: 3, g: null, logged: false };
   const feat = (a) => (S.scale ? (a - mu) / sd : a);
   const F = () => A.map(feat);
   const rmse = (w, b) => { const f = F(); let s = 0; for (let i = 0; i < N; i++) { const e = w * f[i] + b - P[i]; s += e * e; } return Math.sqrt(s / N); };
@@ -45,7 +45,7 @@
 
   function reset() {
     S.play = false; $('play').textContent = 'Play';
-    S.w = S.sw; S.b = S.sb; S.step = 0; S.g = null;
+    S.w = S.sw; S.b = S.sb; S.step = 0; S.g = null; S.logged = false;
     S.path = [[S.w, S.b]]; S.hist = [rmse(S.w, S.b)];
     render();
   }
@@ -57,6 +57,23 @@
     if (r < ro * 1.02) return ['good', 'Converged: the model is within 2% of the best possible fit.'];
     if (S.step >= 100 && r > ro * 1.3) return ['warn', 'Crawling: the error is falling very slowly. Try a larger learning rate or turn feature scaling on.'];
     return ['', S.step ? 'Learning…' : 'Press Step or Play to begin.'];
+  }
+
+  // ---- Auto-record finished runs for the Observations page ----
+  function checkLog(st) {
+    if (S.logged || !S.step) return;
+    let res = null;
+    if (st[0] === 'bad' || !isFinite(S.w + S.b)) res = 'Diverged';
+    else if (st[0] === 'good') res = 'Converged';
+    else if (S.step >= S.max) res = 'Not converged';
+    if (!res) return;
+    S.logged = true;
+    const o = opt(), err = S.hist[S.hist.length - 1];
+    const rec = { t: Date.now(), scale: S.scale, method: S.method, lr: S.lr, steps: S.step, err: isFinite(err) && err < 1e6 ? err : null, best: rmse(o.w, o.b), res: res };
+    try {
+      const a = JSON.parse(localStorage.getItem('gdlab_runs') || '[]'); a.push(rec);
+      localStorage.setItem('gdlab_runs', JSON.stringify(a.slice(-40)));
+    } catch (e) {}
   }
 
   // ---- Canvas helpers ----
@@ -230,7 +247,7 @@
     $('o4').textContent = S.step;
     const a = parseFloat($('pa').value), pr = pred(a);
     $('pp').textContent = ok && isFinite(a) && Math.abs(pr) < 1e6 ? '₹' + pr.toFixed(1) + ' L' : '–';
-    const st = status(); $('status').className = st[0]; $('status').textContent = st[1];
+    const st = status(); $('status').className = st[0]; $('status').textContent = st[1]; checkLog(st);
     $('gline').textContent = S.g ? 'Step ' + S.step + ':  ∂J/∂w = ' + S.g[0].toPrecision(3) + ',  ∂J/∂b = ' + S.g[1].toPrecision(3) + '   →   w ← w − α·∂J/∂w,  b ← b − α·∂J/∂b' : '';
   }
 
@@ -238,7 +255,7 @@
     if (!S.play) return;
     for (let k = 0; k < S.spf && S.step < S.max; k++) stepOnce();
     render();
-    if (S.step >= S.max || status()[0] === 'bad' || !isFinite(S.w + S.b)) { S.play = false; $('play').textContent = 'Play'; }
+    if (S.step >= S.max || ['bad', 'good'].includes(status()[0]) || !isFinite(S.w + S.b)) { S.play = false; $('play').textContent = 'Play'; }
     else requestAnimationFrame(tick);
   }
 
@@ -252,7 +269,7 @@
   $('step').addEventListener('click', () => { S.play = false; $('play').textContent = 'Play'; stepOnce(); render(); });
   $('play').addEventListener('click', () => {
     if (S.play) { S.play = false; $('play').textContent = 'Play'; return; }
-    if (S.step >= S.max) reset();
+    if (S.step >= S.max || S.logged) reset();
     S.play = true; $('play').textContent = 'Pause'; requestAnimationFrame(tick);
   });
   $('reset').addEventListener('click', reset);
