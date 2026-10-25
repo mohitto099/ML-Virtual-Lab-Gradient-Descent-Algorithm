@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Simulation · Gradient Descent Lab</title><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Simulation · Gradient Descent Lab</title><link rel="stylesheet" href="assets/css/style.css?v=3"></head><body>
 <header><small>Machine Learning Virtual Lab</small><h1>Gradient Descent: Pricing Houses in Pune</h1></header>
 <div class="wrap"><nav>
 <a href="index.html">Aim</a>
@@ -8,7 +8,7 @@
 <a href="contributors.html">Contributors</a>
 </nav><main>
 <h2>Simulation</h2>
-<p>Teach the model to price a flat. Prices are in ₹ lakh (1 lakh = ₹1,00,000). Click the contour map to choose a starting point.</p>
+<p>Teach the model to price a flat. Prices are in ₹ lakh (1 lakh = ₹1,00,000). Click the contour map to choose a starting point, and drag the 3D surface to rotate it.</p>
 <div class="panel"><div class="ctl">
 <div><label for="scale">Feature scaling</label><select id="scale"><option value="1">On (standardised area)</option><option value="0">Off (raw sq ft)</option></select></div>
 <div><label for="method">Method</label><select id="method"><option value="batch">Batch (all 40 houses)</option><option value="sgd">Stochastic (1 house)</option><option value="mini">Mini-batch (8 houses)</option></select></div>
@@ -20,13 +20,14 @@
 <div id="status" role="status"></div><div id="gline"></div>
 <div class="grid" style="margin-top:12px">
 <div class="panel"><h4>Houses and the model's price line</h4><canvas id="c1" aria-label="Scatter of area versus price with fitted line"></canvas></div>
-<div class="panel"><h4>Loss landscape (click to set start)</h4><canvas id="c3" aria-label="Contour map of the error with the descent path"></canvas></div>
+<div class="panel"><h4>Loss surface (drag to rotate)</h4><canvas id="c3" style="touch-action:none;cursor:grab" aria-label="3D loss surface with descent path"></canvas></div>
+<div class="panel"><h4>Contour map (click to set start)</h4><canvas id="c4" aria-label="Contour map with descent path"></canvas></div>
 <div class="panel"><h4>Error per step (RMSE, log scale)</h4><canvas id="c2" aria-label="Error versus step"></canvas></div>
-<div class="panel"><h4>What the model has learned</h4><div class="stat">
+<div class="panel" style="grid-column:1/-1"><h4>What the model has learned</h4><div class="stat">
 <div>Price per sq ft<b id="o1">–</b></div><div>Base price<b id="o2">–</b></div>
 <div>Typical error<b id="o3">–</b></div><div>Steps taken<b id="o4">0</b></div></div>
 <div class="ctl"><div><label for="pa">Predict: flat size (sq ft)</label><input type="number" id="pa" value="1200" min="300" max="4000"></div></div>
 <div class="stat"><div>Predicted price<b id="pp">–</b></div></div></div>
 </div>
-<p class="note">Reading the charts: red line = current model, teal dots = houses, dashed ticks = errors. On the map, the cross marks the best possible (w, b).</p>
-</main></div><script src="assets/js/simulation.js"></script></body></html>
+<p class="note">Reading the charts: red line = current model, teal dots = houses, faint red ticks = errors. On the surface and map, the red path is the descent, the white dot is the start, and the gold cross is the best possible (w, b).</p>
+</main></div><script src="assets/js/simulation.js?v=3"></script></body></html>

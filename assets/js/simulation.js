@@ -61,6 +61,7 @@
 
   // ---- Canvas helpers ----
   function fit(c) {
+    c.style.width = '100%'; c.style.height = '300px'; c.style.display = 'block';
     const d = window.devicePixelRatio || 1, r = c.getBoundingClientRect();
     c.width = r.width * d; c.height = r.height * d;
     const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
@@ -104,56 +105,123 @@
     x.strokeStyle = TEAL; x.lineWidth = 2.5; x.stroke();
   }
 
-  // contour map (cached per scaling mode)
+  // ---- Loss surface data (cached per scaling mode) ----
   let G = null;
+  const V3 = { az: -35, el: 28 };
+  const col = (u) => 'hsl(' + (265 - 205 * u) + ',65%,' + (32 + 18 * u) + '%)';
+
   function buildGrid() {
     const o = opt();
     const R = S.scale ? { w0: o.w - 30, w1: o.w + 30, b0: o.b - 70, b1: o.b + 70 } : { w0: o.w - 0.04, w1: o.w + 0.04, b0: o.b - 70, b1: o.b + 70 };
-    const n = 140, c = document.createElement('canvas'); c.width = c.height = n;
-    const g = c.getContext('2d'), im = g.createImageData(n, n), f = F();
-    const val = new Float32Array(n * n); let mx = 0;
-    const Lmin = Math.max(rmse(o.w, o.b), 1e-6);
+    const n = 80, f = F(), val = new Float32Array(n * n), Lmin = Math.max(rmse(o.w, o.b), 1e-6);
+    let mx = 0;
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const w = R.w0 + (i + .5) / n * (R.w1 - R.w0), b = R.b1 - (j + .5) / n * (R.b1 - R.b0);
+      const w = R.w0 + i / (n - 1) * (R.w1 - R.w0), b = R.b1 - j / (n - 1) * (R.b1 - R.b0);
       let s = 0; for (let k = 0; k < N; k++) { const e = w * f[k] + b - P[k]; s += e * e; }
-      const t = Math.log10(Math.sqrt(s / N) / Lmin); val[j * n + i] = t; mx = Math.max(mx, t);
+      const t = Math.log10(Math.sqrt(s / N) / Lmin); val[j * n + i] = t; if (t > mx) mx = t;
     }
-    for (let p = 0; p < n * n; p++) {
-      const t = val[p] / mx, band = Math.floor(t * 14), u = band / 14, k = p * 4, alt = band % 2 ? 7 : 0;
-      im.data[k] = 231 + (22 - 231) * u - alt; im.data[k + 1] = 243 + (50 - 243) * u - alt; im.data[k + 2] = 241 + (79 - 241) * u - alt; im.data[k + 3] = 255;
-    }
-    g.putImageData(im, 0, 0);
-    G = { c, R, scale: S.scale, o };
+    G = { n, val, R, mx, Lmin, scale: S.scale, o };
   }
 
-  const cm = { l: 44, r: 12, t: 12, b: 36 };
-  function mapXY(W, H) {
-    const R = G.R;
-    return [(w) => cm.l + (w - R.w0) / (R.w1 - R.w0) * (W - cm.l - cm.r), (b) => H - cm.b - (b - R.b0) / (R.b1 - R.b0) * (H - cm.t - cm.b)];
+  // marching squares: contour segments at level L, in grid units
+  function segs(L) {
+    const n = G.n, val = G.val, out = [];
+    const lerp = (a, b) => (L - a) / (b - a);
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      const a = val[j * n + i], b = val[j * n + i + 1], c = val[(j + 1) * n + i + 1], d = val[(j + 1) * n + i];
+      const k = (a > L ? 8 : 0) + (b > L ? 4 : 0) + (c > L ? 2 : 0) + (d > L ? 1 : 0);
+      if (k === 0 || k === 15) continue;
+      const T = [i + lerp(a, b), j], Rt = [i + 1, j + lerp(b, c)], B = [i + lerp(d, c), j + 1], Lf = [i, j + lerp(a, d)];
+      const E = { 1: [Lf, B], 2: [B, Rt], 3: [Lf, Rt], 4: [T, Rt], 5: [T, Lf, B, Rt], 6: [T, B], 7: [T, Lf], 8: [T, Lf], 9: [T, B], 10: [T, Rt, Lf, B], 11: [T, Rt], 12: [Lf, Rt], 13: [B, Rt], 14: [Lf, B] }[k];
+      for (let q = 0; q < E.length; q += 2) out.push([E[q][0], E[q][1], E[q + 1][0], E[q + 1][1]]);
+    }
+    return out;
   }
-  function drawMap() {
+
+  const uv = (p) => [(p[0] - G.R.w0) / (G.R.w1 - G.R.w0), (p[1] - G.R.b0) / (G.R.b1 - G.R.b0)];
+  const zAt = (k) => { const v = S.hist[k]; const z = isFinite(v) ? Math.log10(Math.max(v, 1e-9) / G.Lmin) / G.mx : 1.05; return Math.min(Math.max(z, 0), 1.05); };
+
+  function tracePath(x, proj) {
+    let pen = false; x.beginPath();
+    S.path.forEach((p, k) => {
+      if (!isFinite(p[0] + p[1])) { pen = false; return; }
+      const [u, v] = uv(p);
+      if (u < -0.05 || u > 1.05 || v < -0.05 || v > 1.05) { pen = false; return; }
+      const q = proj(u, v, zAt(k));
+      if (pen) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]);
+      pen = true;
+    });
+    x.strokeStyle = RED; x.lineWidth = 2.5; x.lineJoin = 'round'; x.stroke();
+  }
+
+  function markers(x, proj) {
+    const o = uv([G.o.w, G.o.b]), q0 = proj(o[0], o[1], 0);
+    line(x, q0[0] - 7, q0[1] - 7, q0[0] + 7, q0[1] + 7, GOLD, 3); line(x, q0[0] - 7, q0[1] + 7, q0[0] + 7, q0[1] - 7, GOLD, 3);
+    const dot = (p, k, fill) => {
+      if (!isFinite(p[0] + p[1])) return;
+      const [u, v] = uv(p); if (u < 0 || u > 1 || v < 0 || v > 1) return;
+      const q = proj(u, v, zAt(k)); x.fillStyle = fill; x.strokeStyle = INK; x.lineWidth = 2;
+      x.beginPath(); x.arc(q[0], q[1], 5, 0, 7); x.fill(); x.stroke();
+    };
+    dot(S.path[0], 0, '#fff');
+    if (S.path.length > 1) dot(S.path[S.path.length - 1], S.path.length - 1, RED);
+  }
+
+  function drawContour() {
     if (!G || G.scale !== S.scale) buildGrid();
-    const [x, W, H] = fit($('c3')), [X, Y] = mapXY(W, H);
-    x.imageSmoothingEnabled = true;
-    x.drawImage(G.c, cm.l, cm.t, W - cm.l - cm.r, H - cm.t - cm.b);
-    x.save(); x.beginPath(); x.rect(cm.l, cm.t, W - cm.l - cm.r, H - cm.t - cm.b); x.clip();
-    x.beginPath(); S.path.forEach((p, i) => (isFinite(p[0] + p[1]) ? (i ? x.lineTo(X(p[0]), Y(p[1])) : x.moveTo(X(p[0]), Y(p[1]))) : 0));
-    x.strokeStyle = RED; x.lineWidth = 2; x.stroke();
-    x.fillStyle = '#fff'; x.strokeStyle = INK; x.lineWidth = 2;
-    x.beginPath(); x.arc(X(S.sw), Y(S.sb), 5, 0, 7); x.fill(); x.stroke();
-    if (isFinite(S.w + S.b)) { x.fillStyle = RED; x.beginPath(); x.arc(X(S.w), Y(S.b), 5, 0, 7); x.fill(); }
-    const ox = X(G.o.w), oy = Y(G.o.b);
-    line(x, ox - 7, oy - 7, ox + 7, oy + 7, GOLD, 3); line(x, ox - 7, oy + 7, ox + 7, oy - 7, GOLD, 3);
+    const [x, W, H] = fit($('c4')), m = { l: 44, r: 12, t: 12, b: 36 }, pw = W - m.l - m.r, ph = H - m.t - m.b, n = G.n;
+    const px = (u) => m.l + u * pw, py = (v) => m.t + (1 - v) * ph, proj = (u, v) => [px(u), py(v)];
+    x.fillStyle = '#f7fafc'; x.fillRect(m.l, m.t, pw, ph);
+    for (let k = 1; k <= 14; k++) {
+      x.strokeStyle = col(k / 15); x.lineWidth = 1.4; x.beginPath();
+      for (const s of segs(G.mx * k / 15)) { x.moveTo(px(s[0] / (n - 1)), py(1 - s[1] / (n - 1))); x.lineTo(px(s[2] / (n - 1)), py(1 - s[3] / (n - 1))); }
+      x.stroke();
+    }
+    x.save(); x.beginPath(); x.rect(m.l, m.t, pw, ph); x.clip();
+    tracePath(x, proj); markers(x, proj);
     x.restore();
+    x.strokeStyle = GRID; x.strokeRect(m.l, m.t, pw, ph);
     x.fillStyle = MUTE; x.textAlign = 'center';
-    x.fillText(S.scale ? 'w: price per standard-deviation of area' : 'w: ₹ lakh per sq ft', (W + cm.l) / 2, H - 6);
-    x.save(); x.translate(11, H / 2); x.rotate(-Math.PI / 2); x.fillText('b: base price (₹ lakh)', 0, 0); x.restore();
+    x.fillText(S.scale ? 'w: price per standard-deviation of area' : 'w: ₹ lakh per sq ft', m.l + pw / 2, H - 8);
+    x.save(); x.translate(11, m.t + ph / 2); x.rotate(-Math.PI / 2); x.fillText('b: base price (₹ lakh)', 0, 0); x.restore();
+  }
+
+  function drawSurface() {
+    if (!G || G.scale !== S.scale) buildGrid();
+    const [x, W, H] = fit($('c3')), n = G.n, az = V3.az * Math.PI / 180, el = V3.el * Math.PI / 180;
+    const sc = Math.min(W, H * 1.25) * 0.62, cx = W / 2, cy = H * 0.56;
+    const proj = (u, v, z) => {
+      const X = u - 0.5, Y = v - 0.5, Z = (z - 0.5) * 0.9;
+      const a = X * Math.cos(az) - Y * Math.sin(az), d = X * Math.sin(az) + Y * Math.cos(az);
+      return [cx + a * sc, cy - (Z * Math.cos(el) + d * Math.sin(el)) * sc];
+    };
+    const seg = (a, b, c, t, w) => { const p = proj(...a), q = proj(...b); line(x, p[0], p[1], q[0], q[1], c, w); if (t) { x.fillStyle = MUTE; x.textAlign = 'center'; x.fillText(t, q[0], q[1] - 6); } };
+    const fl = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 0]];
+    for (let i = 0; i < 4; i++) seg(fl[i], fl[i + 1], '#c5d2dd', '', 1);
+    seg([0, 0, 0], [1, 0, 0], MUTE, 'w', 1.5); seg([0, 0, 0], [0, 1, 0], MUTE, 'b', 1.5); seg([0, 0, 0], [0, 0, 1], MUTE, 'error', 1.5);
+    x.strokeStyle = 'rgba(18,38,58,.2)'; x.lineWidth = 1;
+    for (let s = 0; s < n; s += 5) {
+      x.beginPath();
+      for (let i = 0; i < n; i++) { const q = proj(i / (n - 1), 1 - s / (n - 1), Math.min(G.val[s * n + i] / G.mx, 1)); if (i) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]); }
+      x.stroke(); x.beginPath();
+      for (let j = 0; j < n; j++) { const q = proj(s / (n - 1), 1 - j / (n - 1), Math.min(G.val[j * n + s] / G.mx, 1)); if (j) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]); }
+      x.stroke();
+    }
+    for (let k = 1; k <= 14; k++) {
+      x.strokeStyle = col(k / 15); x.lineWidth = 1.6; x.beginPath();
+      for (const s of segs(G.mx * k / 15)) {
+        const p = proj(s[0] / (n - 1), 1 - s[1] / (n - 1), k / 15), q = proj(s[2] / (n - 1), 1 - s[3] / (n - 1), k / 15);
+        x.moveTo(p[0], p[1]); x.lineTo(q[0], q[1]);
+      }
+      x.stroke();
+    }
+    tracePath(x, proj); markers(x, proj);
   }
 
   // ---- Readouts ----
   const fmtLR = (v) => (v < 0.001 ? v.toExponential(1) : v.toFixed(3));
   function render() {
-    drawScatter(); drawLoss(); drawMap();
+    drawScatter(); drawLoss(); drawSurface(); drawContour();
     const wr = S.scale ? S.w / sd : S.w, br = S.scale ? S.b - S.w * mu / sd : S.b, ok = isFinite(wr + br);
     $('o1').textContent = ok ? '₹' + Math.round(wr * 1e5).toLocaleString('en-IN') : '–';
     $('o2').textContent = ok ? '₹' + br.toFixed(1) + ' L' : '–';
@@ -189,14 +257,23 @@
   });
   $('reset').addEventListener('click', reset);
   $('pa').addEventListener('input', render);
-  $('c3').addEventListener('click', (e) => {
-    const r = e.target.getBoundingClientRect(), R = G.R;
+  $('c4').addEventListener('click', (e) => {
+    const r = e.target.getBoundingClientRect(), R = G.R, l = 44, rt = 12, t = 12, b = 36;
     const px = e.clientX - r.left, py = e.clientY - r.top;
-    if (px < cm.l || px > r.width - cm.r || py < cm.t || py > r.height - cm.b) return;
-    S.sw = R.w0 + (px - cm.l) / (r.width - cm.l - cm.r) * (R.w1 - R.w0);
-    S.sb = R.b0 + (r.height - cm.b - py) / (r.height - cm.t - cm.b) * (R.b1 - R.b0);
+    if (px < l || px > r.width - rt || py < t || py > r.height - b) return;
+    S.sw = R.w0 + (px - l) / (r.width - l - rt) * (R.w1 - R.w0);
+    S.sb = R.b0 + (r.height - b - py) / (r.height - t - b) * (R.b1 - R.b0);
     reset();
   });
+  let drag = null;
+  $('c3').addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY, V3.az, V3.el]; e.target.setPointerCapture(e.pointerId); });
+  $('c3').addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    V3.az = drag[2] + (e.clientX - drag[0]) * 0.5;
+    V3.el = Math.max(5, Math.min(80, drag[3] + (e.clientY - drag[1]) * 0.3));
+    render();
+  });
+  $('c3').addEventListener('pointerup', () => { drag = null; });
   window.addEventListener('resize', render);
 
   setLR(0.1); reset();
