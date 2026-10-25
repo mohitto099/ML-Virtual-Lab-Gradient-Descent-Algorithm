@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Theory · Gradient Descent Lab</title><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<header><small>Machine Learning Virtual Lab</small><h1>Gradient Descent: Pricing Houses in Pune</h1></header>
+<div class="wrap"><nav>
+<a href="index.html">Aim</a>
+<a href="theory.html" class="on">Theory</a>
+<a href="procedure.html">Procedure</a>
+<a href="simulation.html">Simulation</a>
+<a href="contributors.html">Contributors</a>
+</nav><main>
+<h2>Theory</h2>
+<h3>1. The model</h3>
+<p>For a house of <i>x</i> sq ft, we predict the price (in ₹ lakh) as:</p>
+<div class="formula">ŷ = w · x + b</div>
+<p><b>w</b> is the price added per extra sq ft. <b>b</b> is the base price when area is zero. Learning means finding the best <i>w</i> and <i>b</i>.</p>
+<h3>2. The cost: how wrong are we?</h3>
+<p>For each house, the error is predicted minus actual price. Squaring and averaging gives one number to minimise:</p>
+<div class="formula">J(w, b) = (1 / 2n) · Σ ( ŷᵢ − yᵢ )²</div>
+<p>Plotted against <i>w</i> and <i>b</i>, J forms a bowl. The simulation draws it as a contour map: darker means more error, and the lowest point is the best line.</p>
+<h3>3. The gradient: which way is downhill?</h3>
+<div class="formula">∂J/∂w = (1/n) Σ ( ŷᵢ − yᵢ ) · xᵢ &nbsp;&nbsp;&nbsp; ∂J/∂b = (1/n) Σ ( ŷᵢ − yᵢ )</div>
+<p>If the model underprices most houses, the errors are negative and the gradient says "raise the prices". Larger houses count more in ∂J/∂w because they are multiplied by <i>x</i>.</p>
+<h3>4. The update rule</h3>
+<div class="formula">w ← w − α · ∂J/∂w &nbsp;&nbsp;&nbsp; b ← b − α · ∂J/∂b</div>
+<p>α is the <b>learning rate</b>, the size of each step. Repeat until J stops falling.</p>
+<h3>Worked example (3 houses)</h3>
+<p>Take areas in hundreds of sq ft: (10, ₹50 L), (15, ₹70 L), (20, ₹95 L). Start at w = 0, b = 0 with α = 0.01.</p>
+<table><tr><th>Quantity</th><th>Value</th></tr>
+<tr><td>Predictions</td><td>0, 0, 0</td></tr>
+<tr><td>Errors (ŷ − y)</td><td>−50, −70, −95</td></tr>
+<tr><td>∂J/∂w</td><td>(−500 − 1050 − 1900) / 3 = −1150</td></tr>
+<tr><td>∂J/∂b</td><td>(−215) / 3 ≈ −71.7</td></tr>
+<tr><td>New w, b</td><td>0.01 × 1150 = 11.5, and b ≈ 0.72</td></tr></table>
+<p>Check the new prediction for the 1,000 sq ft house: 11.5 × 10 + 0.72 ≈ ₹116 L against an actual ₹50 L. We overshot. The step was too big for unscaled areas, which leads to the next two ideas.</p>
+<h3>Learning rate</h3>
+<p><b>Too small:</b> training crawls. <b>Too large:</b> each step jumps over the minimum and the error grows (divergence). Somewhere in between, the error falls smoothly.</p>
+<h3>Feature scaling</h3>
+<p>Areas run into the thousands while the base price is a small number, so the bowl becomes a long narrow valley. One learning rate cannot suit both directions: either <i>w</i> zigzags or <i>b</i> crawls. Standardising area as (x − mean) / std makes the bowl round, so a single α works well for both.</p>
+<h3>Batch, stochastic, mini-batch</h3>
+<ul><li><b>Batch</b> uses all 40 houses per step: smooth, steady path.</li>
+<li><b>Stochastic (SGD)</b> uses 1 random house per step: cheap but noisy, and it jitters around the minimum.</li>
+<li><b>Mini-batch</b> uses a handful (8 here): a compromise, and the usual choice in practice.</li></ul>
+</main></div></body></html>

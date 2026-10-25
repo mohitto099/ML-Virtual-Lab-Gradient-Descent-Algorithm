@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Procedure · Gradient Descent Lab</title><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<header><small>Machine Learning Virtual Lab</small><h1>Gradient Descent: Pricing Houses in Pune</h1></header>
+<div class="wrap"><nav>
+<a href="index.html">Aim</a>
+<a href="theory.html">Theory</a>
+<a href="procedure.html" class="on">Procedure</a>
+<a href="simulation.html">Simulation</a>
+<a href="contributors.html">Contributors</a>
+</nav><main>
+<h2>Procedure</h2>
+<p>Open the <a href="simulation.html">Simulation</a> page and work through these experiments in order. Use <b>Reset</b> between them.</p>
+<ol>
+<li><b>Meet the data.</b> Note the 40 houses on the left chart. With w = 0 and b = 0 the model predicts ₹0 for every house, so the error starts high.</li>
+<li><b>Take single steps.</b> Press <b>Step</b> five times. Watch the line rise and the dot on the contour map move toward the dark centre. Read the gradient line under the charts.</li>
+<li><b>Press Play</b> with the defaults (scaling on, learning rate 0.1, batch). Note how many steps it takes to reach "Converged".</li>
+<li><b>Try a tiny learning rate</b> (about 0.001). Record the steps needed and the error after 300 steps.</li>
+<li><b>Try a large learning rate</b> (about 1.0 and above). Observe the error curve and the status message.</li>
+<li><b>Turn feature scaling off.</b> The lab picks a safe learning rate for raw areas. Play, and compare the contour map and the error curve with step 3. Then raise the learning rate until training diverges.</li>
+<li><b>Compare methods.</b> With scaling on, switch between batch, stochastic and mini-batch. Compare how smooth each error curve is and how close each gets to the minimum.</li>
+<li><b>Choose your own start.</b> Click anywhere on the contour map to place the starting point. Does the final line depend on where you began?</li>
+<li><b>Use the model.</b> Enter a flat size in the Predict box and read the price. Compare it to nearby houses on the chart.</li>
+</ol>
+<h3>Record your observations</h3>
+<table><tr><th>Setting</th><th>Steps to converge</th><th>Final error (₹ L)</th><th>Remark</th></tr>
+<tr><td>Scaled, α = 0.1</td><td></td><td></td><td></td></tr>
+<tr><td>Scaled, α = 0.001</td><td></td><td></td><td></td></tr>
+<tr><td>Scaled, α = 1.0+</td><td></td><td></td><td></td></tr>
+<tr><td>Unscaled, safe α</td><td></td><td></td><td></td></tr></table>
+</main></div></body></html>
